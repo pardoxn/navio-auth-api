@@ -1,0 +1,58 @@
+*** a/package.json
+--- b/package.json
+@@
+ {
+   "name": "navio-auth-api",
+   "version": "1.0.0",
+   "type": "module",
+   "scripts": {
++    "seed:dev": "node scripts/seed-dev.mjs",
+     "start": "node src/index.mjs"
+   },
+   "dependencies": {
++    "bcryptjs": "^2.4.3",
+     "cors": "^2.8.5",
+     "express": "^4.19.2",
+     "fs-extra": "^11.2.0"
+   }
+ }
+*** /dev/null
+--- b/scripts/seed-dev.mjs
+@@
++import fs from "fs-extra";
++import path from "path";
++import bcrypt from "bcryptjs";
++import { fileURLToPath } from "url";
++
++const __filename = fileURLToPath(import.meta.url);
++const __dirname = path.dirname(__filename);
++const ROOT = path.resolve(__dirname, "..");
++const DATA_DIR = path.join(ROOT, "..", "local_data");
++const AUTH_DIR = path.join(DATA_DIR, "auth");
++const USERS_DB = path.join(AUTH_DIR, "users.json");
++
++await fs.ensureDir(AUTH_DIR);
++await fs.ensureFile(USERS_DB);
++
++let users = [];
++try { users = JSON.parse(await fs.readFile(USERS_DB, "utf8") || "[]"); } catch {}
++
++const upsertUser = (username, password, role, displayName) => {
++  const hash = bcrypt.hashSync(password, 10);
++  const existing = users.find(u => u.username === username);
++  if (!existing) {
++    users.push({ id: `u-${username}`, username, passwordHash: hash, role, displayName });
++    console.log(`[seed] created ${username}/${password} role=${role}`);
++  } else {
++    existing.passwordHash = hash;
++    existing.role = role;
++    existing.displayName = displayName || existing.displayName || username;
++    delete existing.password;
++    console.log(`[seed] updated ${username} role=${role}`);
++  }
++};
++
++upsertUser("dev", "dev", "admin", "Developer");
++
++await fs.writeFile(USERS_DB, JSON.stringify(users, null, 2));
++console.log(`[seed] users saved → ${USERS_DB}`);

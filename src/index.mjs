@@ -17,10 +17,23 @@ const USERS_FILE = path.join(AUTH_DIR, "users.json");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`[auth] Auth API running on http://localhost:${PORT}`);
+});
+
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({ origin: (o, cb) => cb(null, true), credentials: true }));
+app.use(cors({
+  origin: ["http://localhost:5173","http://127.0.0.1:5173","http://192.168.15.41:5173"],
+  credentials: true
+}));
+
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, time: new Date().toISOString() });
+});
+
+
 
 async function ensureDir(p){ await fs.mkdir(p,{recursive:true}); }
 async function readJsonSafe(fp){ try{ return JSON.parse(await fs.readFile(fp,"utf8")); } catch { return null; } }
