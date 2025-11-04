@@ -127,3 +127,39 @@ app.listen(PORT, ()=>{
   console.log(`[auth] Auth API running on http://localhost:${PORT}`);
   console.log(`[auth] Users DB: ${USERS_FILE}`);
 });
+
+// --- hard logout: clear common auth cookies ---
+app.post('/api/logout', (req, res) => {
+  const opts = { httpOnly: true, sameSite: 'lax', path: '/' };
+  try { ['sid','session','navio_sid','token','jwt'].forEach(n => res.clearCookie(n, opts)); } catch {}
+  res.json({ ok: true });
+});
+
+// --- hard logout: clear common auth cookies ---
+app.post('/api/logout', (req, res) => {
+  const opts = { httpOnly: true, sameSite: 'lax', path: '/' };
+  try { ['sid','session','navio_sid','token','jwt'].forEach(n => res.clearCookie(n, opts)); } catch {}
+  res.json({ ok: true });
+});
+
+// --- HARD LOGOUT: clear ANY cookies seen on this request ---
+app.post('/api/logout', (req, res) => {
+  const raw = req.headers.cookie || '';
+  const names = raw.split(';').map(s => s.split('=')[0].trim()).filter(Boolean);
+  // versuch, alles zu löschen – mit verschiedenen Varianten
+  const clear = (name, extra = {}) => {
+    try { res.clearCookie(name, { path: '/', ...extra }); } catch {}
+    try { res.cookie(name, '', { path: '/', maxAge: 0, ...extra }); } catch {}
+  };
+  // Standard
+  names.forEach(n => clear(n));
+  // evtl. Cookienamen, die nicht im Header sind, aber bekannt klingen
+  ;['sid','session','navio_sid','token','jwt'].forEach(n => clear(n));
+
+  // domain/path-Varianten (zur Sicherheit)
+  names.forEach(n => {
+    clear(n, { domain: req.hostname, sameSite: 'lax' });
+    clear(n, { domain: req.hostname, sameSite: 'none', secure: true });
+  });
+  res.status(200).json({ ok: true, cleared: names });
+});
