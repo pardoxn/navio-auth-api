@@ -1,0 +1,80 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              String    @id @default(cuid())
+  username        String    @unique
+  email           String    @unique
+  passwordHash    String
+  role            Role      @default(USER)
+  emailVerifiedAt DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tokens        Token[]
+  auditAsActor  AuditLog[] @relation("AuditActor")
+  auditAsUser   AuditLog[] @relation("AuditUser")
+  auditAsTarget AuditLog[] @relation("AuditTarget")
+}
+
+model Token {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        TokenType
+  hashedToken String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, type])
+}
+
+model AuditLog {
+  id           String      @id @default(cuid())
+  actorId      String?
+  actor        User?       @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  userId       String?
+  user         User?       @relation("AuditUser", fields: [userId], references: [id], onDelete: SetNull)
+  targetUserId String?
+  targetUser   User?       @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  action       AuditAction
+  meta         Json?
+  createdAt    DateTime    @default(now())
+
+  @@index([action, createdAt])
+  @@index([actorId])
+  @@index([userId])
+  @@index([targetUserId])
+}
+
+enum TokenType {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum AuditAction {
+  USER_REGISTER
+  USER_VERIFY
+  USER_LOGIN
+  USER_LOGOUT
+  PASSWORD_FORGOT
+  PASSWORD_RESET
+
+  ADMIN_USER_UPDATE
+  ADMIN_USER_DEACTIVATE
+  ADMIN_USER_REACTIVATE
+  ADMIN_USER_DELETE
+}
