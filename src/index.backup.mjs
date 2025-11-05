@@ -6,8 +6,6 @@ import fs from "fs/promises";
 import fssync from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { readTours2, writeActive2, markLoaded2, markUnloaded2 } from "./tours2.mjs";
-import layoutRoutes from "./routes/layout.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,16 +17,17 @@ const USERS_FILE = path.join(AUTH_DIR, "users.json");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
-app.use(cookieParser());
-app.use((req, _res, next) => {
-  console.log([new Date().toISOString(), req.method, req.url]);
-  next();
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`[auth] Auth API running on http://localhost:${PORT}`);
 });
 
-app.use("/api/layout", layoutRoutes);
+
+app.use(express.json());
+app.use(cookieParser());
+app.use(cors({
+  origin: ["http://localhost:5173","http://127.0.0.1:5173","http://192.168.15.41:5173"],
+  credentials: true
+}));
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
@@ -124,6 +123,25 @@ app.get("/api/auth/users", requireRole("admin"), respondUsers);
 app.post("/api/users", requireRole("admin"), upsertUser);
 app.post("/api/auth/users", requireRole("admin"), upsertUser);
 
+app.listen(PORT, ()=>{
+  console.log(`[auth] Auth API running on http://localhost:${PORT}`);
+  console.log(`[auth] Users DB: ${USERS_FILE}`);
+});
+
+// --- hard logout: clear common auth cookies ---
+app.post('/api/logout', (req, res) => {
+  const opts = { httpOnly: true, sameSite: 'lax', path: '/' };
+  try { ['sid','session','navio_sid','token','jwt'].forEach(n => res.clearCookie(n, opts)); } catch {}
+  res.json({ ok: true });
+});
+
+// --- hard logout: clear common auth cookies ---
+app.post('/api/logout', (req, res) => {
+  const opts = { httpOnly: true, sameSite: 'lax', path: '/' };
+  try { ['sid','session','navio_sid','token','jwt'].forEach(n => res.clearCookie(n, opts)); } catch {}
+  res.json({ ok: true });
+});
+
 // --- HARD LOGOUT: clear ANY cookies seen on this request ---
 app.post('/api/logout', (req, res) => {
   const raw = req.headers.cookie || '';
@@ -145,49 +163,9 @@ app.post('/api/logout', (req, res) => {
   });
   res.status(200).json({ ok: true, cleared: names });
 });
+import express from "express";
+app.use(express.json());
 import { readTours, setActiveTours, markTourLoaded } from "./tours.mjs";
 app.get("/api/tours", async (req, res) => { try { res.json(await readTours()); } catch (e) { res.status(500).json({ ok:false, error:String(e) }); } });
 app.post("/api/tours/save", async (req, res) => { try { const active = Array.isArray(req.body?.active) ? req.body.active : []; const data = await setActiveTours(active); res.json({ ok:true, data }); } catch (e) { res.status(500).json({ ok:false, error:String(e) }); } });
 app.post("/api/tours/:id/load", async (req, res) => { try { const data = await markTourLoaded(req.params.id, req.body || {}); res.json({ ok:true, data }); } catch (e) { res.status(500).json({ ok:false, error:String(e) }); } });
-
-app.get("/api/tours2", async (_req, res) => {
-  try {
-    const data = await readTours2();
-    res.json({ active: data.active, archive: data.archive });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
-});
-
-app.post("/api/tours2/save", async (req, res) => {
-  try {
-    const active = Array.isArray(req.body?.active) ? req.body.active : [];
-    const data = await writeActive2(active);
-    res.json({ active: data.active, archive: data.archive });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
-});
-
-app.post("/api/tours2/:id/load", async (req, res) => {
-  try {
-    const data = await markLoaded2(req.params.id, req.body || {});
-    res.json({ active: data.active, archive: data.archive });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
-});
-
-app.post("/api/tours2/:id/unload", async (req, res) => {
-  try {
-    const data = await markUnloaded2(req.params.id, req.body || {});
-    res.json({ active: data.active, archive: data.archive });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
-});
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`[auth] Auth API running on http://localhost:${PORT}`);
-  console.log(`[auth] Users DB: ${USERS_FILE}`);
-});
